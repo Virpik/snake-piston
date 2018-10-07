@@ -15,17 +15,28 @@
 
 extern crate piston;
 extern crate graphics;
-extern crate glutin_window;
+extern crate piston_window;
+// extern crate glutin_window;
 extern crate opengl_graphics;
 extern crate rand;
 
+use piston_window::PistonWindow;
+use piston_window::G2d;
 use std::collections::VecDeque;
+
+use piston::window::*;
+use piston::event_loop::*;
+use piston::input::*;
+// use piston_window::*;
+// use glutin_window::GlutinWindow as Window;
+// use opengl_graphics::{ GlGraphics, OpenGL };
 
 use graphics::*;
 use opengl_graphics::{ GlGraphics, OpenGL };
 use piston::event_loop::Events;
-use piston::input::{Button, Event, Input, RenderEvent};
-use piston::input::keyboard::Key;
+// use piston::input::{Button, Event, Input, RenderEvent};
+
+// use piston::input::keyboard::Key;
 use rand::{thread_rng, Rng};
 
     
@@ -70,12 +81,9 @@ impl Snake {
         }
     }
     
-    fn render(&self, t: math::Matrix2d, gfx: &mut GlGraphics) {
+    fn render(&self, t: &mut graphics::Context, gfx: &mut G2d) {
         for p in self.tail.iter() {
-            rectangle(color::hex("8ba673"),
-                      rectangle::square(p.x as f64 * TILE_SIZE, p.y as f64 * TILE_SIZE, TILE_SIZE),
-                      t, gfx
-            );
+            Rectangle::new(color::hex("8ba673")).draw(rectangle::square(p.x as f64 * TILE_SIZE, p.y as f64 * TILE_SIZE, TILE_SIZE), &t.draw_state, t.transform, gfx);
         }
     }
 
@@ -213,7 +221,7 @@ impl Food {
         }
     }
 
-    fn render(&self, t: math::Matrix2d, gfx: &mut GlGraphics) {
+    fn render(&self, t: &mut graphics::Context, gfx: &mut G2d) {
         if self.life_time - self.lived_time < 6 && self.lived_time % 2 == 0 {
             return
         }
@@ -223,7 +231,8 @@ impl Food {
             FoodType::Candy => color::hex("b19d46"),
         };
 
-        rectangle(color, rectangle::square(self.xy.x as f64 * TILE_SIZE, self.xy.y as f64 * TILE_SIZE, TILE_SIZE), t, gfx);
+        Rectangle::new(color).draw(rectangle::square(self.xy.x as f64 * TILE_SIZE, self.xy.y as f64 * TILE_SIZE, TILE_SIZE), &t.draw_state, t.transform, gfx);
+        // rectangle(, , t, gfx);
     }
 }
 
@@ -325,7 +334,13 @@ impl Game {
         }
     }
 
-    fn render(&mut self, t: math::Matrix2d, gfx: &mut GlGraphics) {
+    // fn render_2(&mut self, t: &mut graphics::Context, gfx: &mut G2d) { 
+
+    //     Rectangle::new([1.0, 0.0, 0.0, 1.0]).draw([0.0, 0.0, 100.0, 100.0], &t.draw_state, t.transform, gfx);
+    //     Rectangle::new([1.0, 0.0, 0.0, 1.0]).draw([110.0, 110.0, 100.0, 100.0], &t.draw_state, t.transform, gfx);
+    // }
+    
+    fn render(&mut self, t: &mut graphics::Context, gfx: &mut G2d) { 
         if self.state == State::GameOver {
             clear(color::hex("000000"), gfx);
             return;
@@ -340,9 +355,7 @@ impl Game {
         self.snake.render(t, gfx);
 
         for w in &self.walls {
-            rectangle(color::hex("002951"),
-                      rectangle::square(w.x as f64 * TILE_SIZE, w.y as f64 * TILE_SIZE, TILE_SIZE),
-                      t, gfx);
+            Rectangle::new(color::hex("002951")).draw(rectangle::square(w.x as f64 * TILE_SIZE, w.y as f64 * TILE_SIZE, TILE_SIZE), &t.draw_state, t.transform, gfx);
         }
     }
 
@@ -389,37 +402,63 @@ impl Game {
 }
 
 fn main() {
-    use glutin_window::GlutinWindow as Window;
-    use piston::window::WindowSettings;
+    // use glutin_window::GlutinWindow as Window;
+    use piston::window::*;
+
+    use piston::input::Button::Keyboard;
 
     println!("R => Restart\nP => Pause\nEsc => Quit");
 
-    let window = Window::new(
-        WindowSettings::new("Snake - Piston",
-                            [BOARD_WIDTH as u32 * TILE_SIZE as u32, BOARD_HEIGHT as u32 * TILE_SIZE as u32])
-            .exit_on_esc(true)
-		).unwrap();
-    
-    let mut gfx = GlGraphics::new(OpenGL::V3_2);
+    let opengl = OpenGL::V3_2;
 
+    let mut window: PistonWindow = WindowSettings::new("Snake - Piston", [BOARD_WIDTH as u32 * TILE_SIZE as u32, BOARD_HEIGHT as u32 * TILE_SIZE as u32])
+            .opengl(opengl)
+            .exit_on_esc(true)
+            .build()
+            .unwrap();
+    
+    // let mut gfx = GlGraphics::new(opengl);
     let mut game = Game::new();
 
-    for e in window.events() {
-        match e {
-            Event::Render(args) => {
-                let t = Context::new_viewport(args.viewport()).transform;
-                game.render(t, &mut gfx);
-            }
+    let mut events = Events::new(EventSettings::new());
+    
+    while let Some(e) = events.next(&mut window) {
+    
+        window.draw_2d(&e, |c, g| {
 
-            Event::Input(Input::Press(Button::Keyboard(key))) => {
-                game.key_press(key);
-            }
+            let mut c = c;
+            let g = g;
+            
+            game.render(&mut c, g);
 
-            Event::Update(args) => {
-                game.update(args.dt);
-            }
+            // game.render(c.transform, &mut g);
 
-            _ => {}
+            // clear([0.8, 0.8, 0.8, 1.0], g);
+            // g.clear_stencil(0);
+            
+            // Rectangle::new([1.0, 0.0, 0.0, 1.0]).draw([0.0, 0.0, 100.0, 100.0], &c.draw_state, c.transform, g);
+            // Rectangle::new([1.0, 0.0, 0.0, 1.0]).draw([110.0, 110.0, 100.0, 100.0], &c.draw_state, c.transform, g);
+        });        
+    /*        
+        if let Some(r) = e.render_args() {
+
+            let v_port = r.viewport();
+            
+            let t = Context::new_viewport(v_port).transform;
+            
+            println!("Render: {:?} {:?}", r, t);
+
+            game.render(t, &mut gfx);
+        }
+     */   
+        if let Some(u) = e.update_args() {
+            // println!("update: {:?}", u);
+            game.update(u.dt);
+        }
+
+        if let Some(Keyboard(key)) = e.press_args() {
+            // println!("Press: {:?}", key);
+            game.key_press(key);
         }
     }
 }
